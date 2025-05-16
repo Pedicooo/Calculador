@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora de Salgados</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container my-5">
+        <h1 class="text-center mb-4">Calculadora de Custo de Salgados</h1>
+
+        <!-- Seção Massa -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Ingredientes da Massa</h3>
+            </div>
+            <div class="card-body">
+                <div id="massa-items"></div>
+                <button onclick="adicionarItem('massa')" class="btn btn-primary">Adicionar Ingrediente da Massa</button>
+            </div>
+        </div>
+
+        <!-- Seção Recheio -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Ingredientes do Recheio</h3>
+            </div>
+            <div class="card-body">
+                <div id="recheio-items"></div>
+                <button onclick="adicionarItem('recheio')" class="btn btn-primary">Adicionar Ingrediente do Recheio</button>
+            </div>
+        </div>
+
+        <!-- Seção Embalagem -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Materiais de Embalagem</h3>
+            </div>
+            <div class="card-body">
+                <div id="embalagem-items"></div>
+                <button onclick="adicionarItem('embalagem')" class="btn btn-primary">Adicionar Material de Embalagem</button>
+            </div>
+        </div>
+
+        <!-- Informações Adicionais -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Informações Adicionais</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label>Quantidade de Salgados:</label>
+                        <input type="number" id="quantidade_salgados" class="form-control" min="1">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label>Margem de Lucro (%):</label>
+                        <input type="number" id="margem_lucro" class="form-control" min="0">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button onclick="calcular()" class="btn btn-success btn-lg w-100 mb-4">Calcular</button>
+
+        <div id="resultados" class="card mb-4" style="display: none;">
+            <div class="card-header">
+                <h3>Resultados</h3>
+            </div>
+            <div class="card-body" id="resultados-content"></div>
+        </div>
+    </div>
+
+    <script>
+        const ingredientesMassa = {{ ingredientes_massa|tojson|safe }};
+        const ingredientesRecheio = {{ ingredientes_recheio|tojson|safe }};
+        const materiaisEmbalagem = {{ materiais_embalagem|tojson|safe }};
+
+        function criarSelect(tipo) {
+            let options = [];
+            switch(tipo) {
+                case 'massa':
+                    options = ingredientesMassa;
+                    break;
+                case 'recheio':
+                    options = ingredientesRecheio;
+                    break;
+                case 'embalagem':
+                    options = materiaisEmbalagem;
+                    break;
+            }
+            
+            return options.map(item => `<option value="${item}">${item}</option>`).join('');
+        }
+
+        function adicionarItem(tipo) {
+            const container = document.getElementById(`${tipo}-items`);
+            const div = document.createElement('div');
+            div.className = 'mb-3 p-3 border rounded';
+            div.innerHTML = `
+                <div class="row">
+                    <div class="col-md-3 mb-2">
+                        <label>Item:</label>
+                        <select class="form-control ${tipo}-nome">
+                            ${criarSelect(tipo)}
+                        </select>
+                    </div>
+                    <div class="col-md-3 mb-2">
+                        <label>Preço (R$):</label>
+                        <input type="number" step="0.01" class="form-control ${tipo}-preco" min="0">
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <label>Qtd. Total:</label>
+                        <input type="number" class="form-control ${tipo}-qtd-total" min="0">
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <label>Qtd. Usada:</label>
+                        <input type="number" class="form-control ${tipo}-qtd-usada" min="0">
+                    </div>
+                    <div class="col-md-2 mb-2">
+                        <label>&nbsp;</label>
+                        <button onclick="this.parentElement.parentElement.parentElement.remove()" 
+                                class="btn btn-danger form-control">Remover</button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function coletarDados(tipo) {
+            const items = [];
+            document.querySelectorAll(`.${tipo}-nome`).forEach((select, index) => {
+                const preco = document.querySelectorAll(`.${tipo}-preco`)[index].value;
+                const qtdTotal = document.querySelectorAll(`.${tipo}-qtd-total`)[index].value;
+                const qtdUsada = document.querySelectorAll(`.${tipo}-qtd-usada`)[index].value;
+                
+                if (preco && qtdTotal && qtdUsada) {
+                    items.push({
+                        nome: select.value,
+                        preco: preco,
+                        qtd_total: qtdTotal,
+                        qtd_usada: qtdUsada
+                    });
+                }
+            });
+            return items;
+        }
+
+        function calcular() {
+            const dados = {
+                massa: coletarDados('massa'),
+                recheio: coletarDados('recheio'),
+                embalagem: coletarDados('embalagem'),
+                quantidade_salgados: document.getElementById('quantidade_salgados').value,
+                margem_lucro: document.getElementById('margem_lucro').value
+            };
+
+            if (!dados.quantidade_salgados || !dados.margem_lucro) {
+                alert('Preencha a quantidade de salgados e a margem de lucro.');
+                return;
+            }
+
+            fetch('/calcular', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(dados)
+            })
+            .then(response => response.json())
+            .then(resultado => {
+                let html = '';
+                
+                if (resultado.detalhes_massa.length > 0) {
+                    html += '<h4>Custos da Massa:</h4>';
+                    resultado.detalhes_massa.forEach(item => {
+                        html += `<p>${item.nome}: R$ ${item.custo.toFixed(2)}</p>`;
+                    });
+                    html += `<p><strong>Total da Massa: R$ ${resultado.total_massa.toFixed(2)}</strong></p>`;
+                }
+
+                if (resultado.detalhes_recheio.length > 0) {
+                    html += '<h4 class="mt-3">Custos do Recheio:</h4>';
+                    resultado.detalhes_recheio.forEach(item => {
+                        html += `<p>${item.nome}: R$ ${item.custo.toFixed(2)}</p>`;
+                    });
+                    html += `<p><strong>Total do Recheio: R$ ${resultado.total_recheio.toFixed(2)}</strong></p>`;
+                }
+
+                if (resultado.detalhes_embalagem.length > 0) {
+                    html += '<h4 class="mt-3">Custos de Embalagem:</h4>';
+                    resultado.detalhes_embalagem.forEach(item => {
+                        html += `<p>${item.nome}: R$ ${item.custo.toFixed(2)}</p>`;
+                    });
+                    html += `<p><strong>Total de Embalagem: R$ ${resultado.total_embalagem.toFixed(2)}</strong></p>`;
+                }
+
+                html += `
+                    <div class="alert alert-info mt-3">
+                        <h4>Custo Total: R$ ${resultado.total_geral.toFixed(2)}</h4>
+                        <p>Custo por Unidade: R$ ${resultado.custo_por_unidade.toFixed(2)}</p>
+                        <p>Preço de Venda Sugerido: R$ ${resultado.preco_venda.toFixed(2)}</p>
+                    </div>
+                `;
+
+                document.getElementById('resultados-content').innerHTML = html;
+                document.getElementById('resultados').style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao calcular.');
+            });
+        }
+    </script>
+</body>
+</html>
